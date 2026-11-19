@@ -1,0 +1,25 @@
+# Python packages for the Serlachius RAG prototype, pinned to the versions in
+# the project's virtual environment on the author's machine, which ran the
+# prototype in the staff evaluation (BIE 3, October 2026). Python 3.13.12.
+#
+# Install:  python3.13 -m venv venv && source venv/bin/activate
+#           pip install -r requirements.txt
+#
+# Not installable with pip (see README):
+#   - Ollama, with the Poro 2 model registered under the name "poro2"
+#   - poppler, which provides pdftotext (used only by ingest_v4.py)
+
+# Retrieval
+chromadb==1.5.9
+sentence-transformers==5.7.0
+transformers==5.15.0
+tokenizers==0.22.2
+torch==2.13.0
+numpy==2.5.2
+
+# Generation (client for the local Ollama server)
+ollama==0.6.2
+httpx==0.28.1
+
+# Interface
+flask==3.1.3

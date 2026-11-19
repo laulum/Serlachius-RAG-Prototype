@@ -1,0 +1,33 @@
+# The corpus: the Gösta Serlachius Fine Arts Foundation's publications.
+# Copyrighted; never commit.
+*.pdf
+*.docx
+AI AGENTTI Copy/
+AI AGENTTI copy/
+SERLACHIUS JULKAISUT/
+corpus_pdfs/
+old_corpus/
+
+# The vector store holds the publications' text in chunks.
+store/
+
+# Study data: logs of participants' questions and interface events, and the
+# prepared cases, which contain verbatim source passages.
+*.jsonl
+tapaukset.json
+*.xlsx
+*.rtf
+
+# Local environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+env_*.txt
+
+# Editor and system files
+.DS_Store
+*.bak
+.vscode/
+.idea/

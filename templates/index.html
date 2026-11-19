@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<!--
+  Serlachius RAG prototype: the interface used in the staff evaluation
+  (templates/index.html). Part of the MBA thesis "Designing for
+  Trustworthiness" (Lauri Lumme, Haaga-Helia University of Applied Sciences,
+  2026). As frozen for the evaluation on 21 October 2026; comments added on
+  19 November 2026, no code changed.
+
+  One template serves both modes of app.py: live answers from /api/kysy, and
+  prepared cases (window.TAPAUS) replayed through the same display functions.
+
+  Interface text, translated:
+    "Serlachius - aineistohaku"   Serlachius - material search
+    "Tunnus"                      participant code
+    "Hae"                         Search
+    "Vastaus perustuu vain museon julkaisuihin."
+                                  The answer is based only on the museum's publications.
+    "Haetaan... tämä kestää yleensä puolisen minuuttia."
+                                  Searching... this usually takes about half a minute.
+    "Vastaus / Tarkistus / Lähteet"   Answer / Check / Sources
+    "Vuosiluvut / Lainaukset"     Years / Quotations (the two check rows)
+    "näytä teksti"                show text
+    "Vastaus muodostettiin n sekunnissa."   The answer was generated in n seconds.
+-->
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serlachius — aineistohaku</title>
+<style>
+  :root {
+    --ink:#1a1a1a; --muted:#6b6b6b; --line:#dcdcdc;
+    --panel:#f7f7f6; --warn:#a4342a; --bg:#ffffff;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width:760px; margin:0 auto; padding:28px 24px 80px; }
+
+  header { display:flex; align-items:baseline; justify-content:space-between;
+           gap:16px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+  h1 { font-size:18px; font-weight:600; margin:0; }
+  .osallistuja { font-size:13px; color:var(--muted); }
+  .osallistuja input { font:inherit; width:70px; padding:3px 6px;
+                       border:1px solid var(--line); border-radius:4px; }
+
+  form { margin:26px 0 0; }
+  textarea {
+    width:100%; min-height:76px; resize:vertical; padding:12px 14px;
+    font:inherit; color:var(--ink); border:1px solid var(--line); border-radius:6px;
+  }
+  textarea:focus { outline:2px solid #999; outline-offset:-1px; }
+  .rivi { display:flex; align-items:center; gap:14px; margin-top:10px; }
+  button {
+    font:inherit; font-weight:600; padding:9px 20px; border:1px solid var(--ink);
+    background:var(--ink); color:#fff; border-radius:6px; cursor:pointer;
+  }
+  button:disabled { background:var(--muted); border-color:var(--muted); cursor:default; }
+  .vihje { font-size:13px; color:var(--muted); }
+
+  #tila { margin-top:28px; color:var(--muted); font-size:15px; display:none; }
+
+  #tulos { margin-top:32px; display:none; }
+  .lohko { margin-top:26px; }
+  .otsikko { font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+             color:var(--muted); font-weight:600; margin-bottom:8px; }
+
+  #vastaus { font-size:18px; line-height:1.6; white-space:pre-wrap; }
+  .viite { color:var(--ink); background:var(--panel); border:1px solid var(--line);
+           border-radius:4px; padding:0 4px; font-size:14px; cursor:pointer; }
+  .viite:hover { background:#ececea; }
+
+  .tarkistus { border:1px solid var(--line); border-radius:6px; padding:14px 16px;
+               background:var(--panel); }
+  .tark-rivi { display:flex; gap:10px; align-items:flex-start; padding:3px 0; }
+  .merkki { flex:0 0 16px; text-align:center; font-weight:700; line-height:1.55; }
+  .ok   .merkki { color:var(--ink); }
+  .huom .merkki { color:var(--warn); }
+  .ei   .merkki { color:var(--muted); }
+  .huom .teksti { color:var(--warn); }
+  .ei   .teksti { color:var(--muted); }
+  .tark-nimi { font-weight:600; }
+  .kattavuus { margin-top:12px; padding-top:11px; border-top:1px solid var(--line);
+               font-size:13.5px; color:var(--muted); }
+
+  details { border-top:1px solid var(--line); }
+  details:last-of-type { border-bottom:1px solid var(--line); }
+  summary { cursor:pointer; padding:11px 2px; list-style:none; display:flex;
+            gap:10px; align-items:baseline; }
+  summary::-webkit-details-marker { display:none; }
+  .nro { flex:0 0 26px; color:var(--muted); font-size:14px; }
+  .avaa { margin-left:auto; font-size:13px; color:var(--muted); }
+  details[open] .avaa { visibility:hidden; }
+  .katkelma { padding:4px 2px 18px 36px; font-size:15px; line-height:1.6;
+              color:#333; white-space:pre-wrap; }
+  .kesto { margin-top:26px; font-size:12.5px; color:var(--muted); }
+  .virhe { color:var(--warn); margin-top:26px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Serlachius — aineistohaku</h1>
+    <label class="osallistuja">Tunnus
+      <input id="osallistuja" value="{{ participant }}" autocomplete="off">
+    </label>
+  </header>
+
+  <form id="lomake">
+    <textarea id="kysymys" placeholder="Kirjoita kysymyksesi aineistosta…" autofocus></textarea>
+    <div class="rivi">
+      <button id="laheta" type="submit">Hae</button>
+      <span class="vihje">Vastaus perustuu vain museon julkaisuihin.</span>
+    </div>
+  </form>
+
+  <div id="tila">Haetaan… tämä kestää yleensä puolisen minuuttia.</div>
+  <div id="virhe" class="virhe" style="display:none"></div>
+
+  <div id="tulos">
+    <div class="lohko">
+      <div class="otsikko">Vastaus</div>
+      <div id="vastaus"></div>
+    </div>
+
+    <div class="lohko">
+      <div class="otsikko">Tarkistus</div>
+      <div class="tarkistus">
+        <div id="tark-vuodet" class="tark-rivi"></div>
+        <div id="tark-lainaukset" class="tark-rivi"></div>
+        <!-- Shown under every answer: "The check covers years and verbatim
+             quotations. Other claims, such as names, places or the context of
+             events, are not checked automatically." -->
+        <div class="kattavuus">
+          Tarkistus kattaa vuosiluvut ja sanatarkat lainaukset. Muita väitteitä —
+          esimerkiksi nimiä, paikkoja tai tapahtumien yhteyksiä — ei tarkisteta
+          automaattisesti.
+        </div>
+      </div>
+    </div>
+
+    <div class="lohko">
+      <div class="otsikko">Lähteet</div>
+      <!-- All k = 4 retrieved chunks, collapsed, in rank order. Opening one is
+           logged as lahde_avattu (source opened). -->
+      <div id="lahteet"></div>
+    </div>
+
+    <div id="kesto" class="kesto"></div>
+  </div>
+
+</div>
+
+{% if tapaus %}<script>window.TAPAUS = {{ tapaus | tojson }};</script>{% endif %}
+
+<script>
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function tapahtuma(event, fields) {
+  // On a prepared case, stamp every event with its case id so that
+  // lahde_avattu and viite_klikattu identify themselves regardless of
+  // how the tabs were opened. Empty on the live interface.
+  const extra = window.TAPAUS ? {tapaus: window.TAPAUS.id} : {};
+  fetch("/api/tapahtuma", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(Object.assign({event}, extra, fields || {}))
+  });
+}
+
+// Display of the two checks. Each status maps to a class and a symbol:
+//   ok   = tick, a named check passed
+//   huom = warning symbol in red, a check failed ("huom" = note/attention)
+//   ei   = dot in grey, nothing to check ("ei" = no)
+// There is deliberately no overall verdict on the answer: a green signal on
+// an answer that may be fabricated would claim more than the checks can.
+// Years: PASS / WARNING / FAIL / NO_CLAIMS. Quotes: QUOTES_OK / QUOTE_ALTERED /
+// NO_QUOTES / NO_SOURCE. A tick is attached to a named check, never to the answer.
+const LUOKKA = {
+  PASS:"ok", QUOTES_OK:"ok",
+  WARNING:"huom", FAIL:"huom", QUOTE_ALTERED:"huom",
+  NO_CLAIMS:"ei", NO_QUOTES:"ei", NO_SOURCE:"ei"
+};
+const MERKKI = { ok:"✓", huom:"⚠", ei:"·" };
+
+function tarkistusRivi(el, nimi, tulos) {
+  const luokka = LUOKKA[tulos.status] || "ei";
+  el.className = "tark-rivi " + luokka;
+  el.innerHTML = '<span class="merkki">' + MERKKI[luokka] + '</span>' +
+                 '<span class="teksti"><span class="tark-nimi">' + nimi + '</span> — ' +
+                 esc(tulos.note) + '</span>';
+}
+
+function naytaLahteet(sources) {
+  const juuri = $("lahteet");
+  juuri.innerHTML = "";
+  sources.forEach(s => {
+    const d = document.createElement("details");
+    d.id = "lahde-" + s.n;
+    d.innerHTML =
+      '<summary><span class="nro">[' + s.n + ']</span>' +
+      '<span>' + esc(s.doc) + ', s. ' + esc(String(s.page)) + '</span>' +
+      '<span class="avaa">näytä teksti</span></summary>' +
+      '<div class="katkelma">' + esc(s.text) + '</div>';
+    d.addEventListener("toggle", () => {
+      if (d.open) tapahtuma("lahde_avattu", {n:s.n, doc:s.doc, page:s.page});
+    });
+    juuri.appendChild(d);
+  });
+}
+
+function naytaVastaus(teksti) {
+  // [n] markers become links to the matching source. The numbering is built by
+  // ask.py from the same ordered list shown under Lähteet.
+  $("vastaus").innerHTML = esc(teksti).replace(/\[(\d+)\]/g,
+    (m, n) => '<span class="viite" data-n="' + n + '">[' + n + ']</span>');
+  $("vastaus").querySelectorAll(".viite").forEach(v => {
+    v.addEventListener("click", () => {
+      const n = v.dataset.n;
+      const d = $("lahde-" + n);
+      // Known gap in the click log: a marker whose number has no matching source
+      // returns here, before the click is logged (thesis, section 4.3.4).
+      if (!d) return;
+      d.open = true;
+      d.scrollIntoView({behavior:"smooth", block:"center"});
+      tapahtuma("viite_klikattu", {n: Number(n)});
+    });
+  });
+}
+
+$("osallistuja").addEventListener("change", e => {
+  fetch("/api/osallistuja", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({participant: e.target.value})
+  });
+});
+
+$("lomake").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (window.TAPAUS) return;          // prepared case: no live queries
+  const kysymys = $("kysymys").value.trim();
+
+  $("tulos").style.display = "none";
+  $("virhe").style.display = "none";
+  $("tila").style.display = "block";
+  $("laheta").disabled = true;
+
+  try {
+    const r = await fetch("/api/kysy", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question: kysymys})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Tuntematon virhe");
+
+    naytaVastaus(data.answer);
+    tarkistusRivi($("tark-vuodet"), "Vuosiluvut", data.years);
+    tarkistusRivi($("tark-lainaukset"), "Lainaukset", data.quotes);
+    naytaLahteet(data.sources);
+    $("kesto").textContent = "Vastaus muodostettiin " + data.elapsed_s + " sekunnissa.";
+    $("tulos").style.display = "block";
+  } catch (err) {
+    $("virhe").textContent = err.message;
+    $("virhe").style.display = "block";
+  } finally {
+    $("tila").style.display = "none";
+    $("laheta").disabled = false;
+  }
+});
+
+// Prepared case (BIE 3): render stored output through the same display path
+// the live interface uses. No new rendering code.
+if (window.TAPAUS) {
+  const d = window.TAPAUS;
+  $("kysymys").value = d.question;
+  $("kysymys").readOnly = true;
+  $("laheta").disabled = true;
+  naytaVastaus(d.answer);
+  tarkistusRivi($("tark-vuodet"), "Vuosiluvut", d.years);
+  tarkistusRivi($("tark-lainaukset"), "Lainaukset", d.quotes);
+  naytaLahteet(d.sources);
+  $("kesto").textContent = "Vastaus muodostettiin " + d.elapsed_s + " sekunnissa.";
+  $("tulos").style.display = "block";
+}
+
+</script>
+</body>
+</html>
